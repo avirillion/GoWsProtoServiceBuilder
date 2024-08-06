@@ -1,0 +1,4 @@
+github.com/yoheimuta/go-protoparser/v4 v4.11.0 h1:zhP3R1bzopFKOco4YouXR7X126ggQX3nQ12OcW958CA=
+github.com/yoheimuta/go-protoparser/v4 v4.11.0/go.mod h1:AHNNnSWnb0UoL4QgHPiOAg2BniQceFscPI5X/BZNHl8=
+google.golang.org/protobuf v1.34.2 h1:6xV6lTsCfpGD21XK49h7MhtcApnLqkfYgPcdHftf6hg=
+google.golang.org/protobuf v1.34.2/go.mod h1:qYOHts0dSfpeUzUFpOMr/WGzszTmLH+DiWniOlNbLDw=
