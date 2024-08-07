@@ -1,10 +1,11 @@
 package main
 
 import (
-	servicebuilder "GoWsProtoServiceBuilder/generator"
 	"fmt"
 	"log"
 	"os"
+
+	servicebuilder "github.com/avirillion/GoWsProtoServiceBuilder/generator"
 
 	pp "github.com/yoheimuta/go-protoparser/v4"
 	"github.com/yoheimuta/go-protoparser/v4/parser"
