@@ -10,21 +10,18 @@ import (
 	"github.com/yoheimuta/go-protoparser/v4/parser"
 )
 
-const voidTypeName = "Void"
-
-func GenerateGoService(pbuf *parser.Proto, goServiceFile string) error {
+func GenerateGoRpcService(pbuf *parser.Proto, goBaseDir string, pkg string) error {
 	pb, err := protoparser.UnorderedInterpret(pbuf)
 	if err != nil {
 		return err
 	}
-	pkg := "api"
 
-	code, err := generateGoServiceInterface(pb, pkg)
+	code, err := generateGoRpcInterface(pb, pkg)
 	if err != nil {
 		return fmt.Errorf("error generating go code: %v \n%s", err, code)
 	}
 
-	filename := fmt.Sprintf("%s/%s.go", goServiceFile, "rpc-service_gen")
+	filename := fmt.Sprintf("%s/%s/%s.go", goBaseDir, pkg, "rpc-service_gen")
 	err = writeFile(filename, code)
 	if err != nil {
 		return err
@@ -35,7 +32,7 @@ func GenerateGoService(pbuf *parser.Proto, goServiceFile string) error {
 		return fmt.Errorf("error generating go code: %v \n%s", err, code)
 	}
 
-	filename = fmt.Sprintf("%s/%s.go", goServiceFile, "rpc-handler_gen")
+	filename = fmt.Sprintf("%s/%s/%s.go", goBaseDir, pkg, "rpc-handler_gen")
 	err = writeFile(filename, code)
 	if err != nil {
 		return err
@@ -43,43 +40,18 @@ func GenerateGoService(pbuf *parser.Proto, goServiceFile string) error {
 	return nil
 }
 
-// generateGoServiceInterface writes the interface definition for the service
-func generateGoServiceInterface(pb *unordered.Proto, pkg string) (string, error) {
+// generateGoRpcInterface writes the interface definition for the service
+func generateGoRpcInterface(pb *unordered.Proto, pkg string) (string, error) {
 	var sb strings.Builder
-	w := func(s string) { sb.WriteString(s) }
-	wn := func(s string) { sb.WriteString(s + "\n") }
-	wn("package " + pkg)
+	w := func(s string) { sb.WriteString(s + "\n") }
+	w("package " + pkg)
 
 	for _, srv := range pb.ProtoBody.Services {
 		if !hasServiceOption(srv, "(is_rpc)") {
 			continue
 		}
 
-		wn("type " + srv.ServiceName + " interface {")
-		for _, rpc := range srv.ServiceBody.RPCs {
-
-			if len(rpc.Comments) > 0 {
-				wn("")
-			}
-			for _, c := range rpc.Comments {
-				wn(c.Raw)
-			}
-			w(rpc.RPCName + "(")
-
-			// parameter
-			if rpc.RPCRequest.MessageType != voidTypeName {
-				w("param *" + rpc.RPCRequest.MessageType)
-			}
-			w(")")
-
-			// response
-			if rpc.RPCResponse.MessageType != voidTypeName {
-				wn(" (*" + rpc.RPCResponse.MessageType + ", error)")
-			} else {
-				wn(" error")
-			}
-		}
-		wn("}")
+		w(writeInterface(srv, srv.ServiceName, true))
 	}
 
 	formattedCode, err := format.Source([]byte(sb.String()))
@@ -93,27 +65,13 @@ func generateGoServiceInterface(pb *unordered.Proto, pkg string) (string, error)
 // call the corresponding handler function and manage all de-/serialization of parameters and responses
 func generateGoRpcHandler(pb *unordered.Proto, pkg string) (string, error) {
 	var sb strings.Builder
-	wn := func(s string) { sb.WriteString(s + "\n") }
+	w := func(s string) { sb.WriteString(s + "\n") }
 
-	wn("package " + pkg + "\n")
-	wn("import \"google.golang.org/protobuf/proto\"")
-	wn(generatorWarning)
+	w("package " + pkg + "\n")
+	w("import \"google.golang.org/protobuf/proto\"")
+	w(generatorWarning)
 
-	wn(`type WebSocket interface {
-		Write(msg []byte) error
-		WriteBinary(msg []byte) error
-		Set(key string, value interface{})
-		Get(key string) (value interface{}, exists bool)
-	}
-	`)
-
-	wn(`type Logger interface {
-		Log(str string)
-		Logf(format string, a ...any)
-	}
-	`)
-
-	wn(`func sendAndReturnError(s WebSocket, responseId []byte, err error) error {
+	w(`func sendAndReturnError(s WebSocket, responseId []byte, err error) error {
 	  errResponse := &ErrorDto{
 			Error: err.Error(),
 		}
@@ -130,7 +88,7 @@ func generateGoRpcHandler(pb *unordered.Proto, pkg string) (string, error) {
 		if !hasServiceOption(srv, "(is_rpc)") {
 			continue
 		}
-		wn("func Handle" + srv.ServiceName + "Request(s WebSocket, handler " + srv.ServiceName + `, log Logger, inData []byte) error {
+		w("func Handle" + srv.ServiceName + "Request(s WebSocket, handler " + srv.ServiceName + `, log Logger, inData []byte) error {
 			// get rpc function name
 			var name string
 			for i := 0; i < len(inData); i++ {
@@ -149,14 +107,14 @@ func generateGoRpcHandler(pb *unordered.Proto, pkg string) (string, error) {
 			switch name {`)
 
 		for _, rpc := range srv.ServiceBody.RPCs {
-			wn("	case \"" + rpc.RPCName + "\":")
-			wn("	log.Log(\"Request: '" + rpc.RPCName + "'\")")
+			w("	case \"" + rpc.RPCName + "\":")
+			w("	log.Log(\"Request: '" + rpc.RPCName + "'\")")
 
 			// De-Serialize input parameter
 			param := ""
 			if rpc.RPCRequest.MessageType != voidTypeName {
-				wn("	prm := &" + rpc.RPCRequest.MessageType + "{}")
-				wn(`	if err := proto.Unmarshal(inData, prm); err != nil {
+				w("	prm := &" + rpc.RPCRequest.MessageType + "{}")
+				w(`	if err := proto.Unmarshal(inData, prm); err != nil {
 					return sendAndReturnError(s, responseId, err)
 				}`)
 				param = "prm"
@@ -164,31 +122,31 @@ func generateGoRpcHandler(pb *unordered.Proto, pkg string) (string, error) {
 
 			// Invoke handler
 			if rpc.RPCResponse.MessageType != voidTypeName {
-				wn(fmt.Sprintf("	resp, err := handler.%s(%s)", rpc.RPCName, param))
+				w(fmt.Sprintf("	resp, err := handler.%s(%s)", rpc.RPCName, param))
 			} else {
-				wn(fmt.Sprintf("	err := handler.%s(%s)", rpc.RPCName, param))
+				w(fmt.Sprintf("	err := handler.%s(%s)", rpc.RPCName, param))
 			}
-			wn(`	if err != nil {
+			w(`	if err != nil {
 			return sendAndReturnError(s, responseId, err)
 			}`)
 
 			// Serialize result data
 			if rpc.RPCResponse.MessageType != voidTypeName {
-				wn(`	outData, err = proto.Marshal(resp)
+				w(`	outData, err = proto.Marshal(resp)
 				if err != nil {
 				return sendAndReturnError(s, responseId, err)
 				}`)
 			}
 
-			wn("")
+			w("")
 		}
 
-		wn(`	default:
+		w(`	default:
 					log.Log("Invalid rpc call: \"" + name + "\"")
 				}`)
 
 		// Send response
-		wn(`if len(outData) == 0 {
+		w(`if len(outData) == 0 {
 			outData, _ = proto.Marshal(&` + voidTypeName + `{})
 		}
 		response := make([]byte, len(responseId) + len(outData))
@@ -198,7 +156,7 @@ func generateGoRpcHandler(pb *unordered.Proto, pkg string) (string, error) {
 		`)
 
 		// No error
-		wn(`	return nil
+		w(`	return nil
 		}
 		`)
 	}
