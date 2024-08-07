@@ -11,7 +11,7 @@
             "mode": "auto",
             "program": "service-builder.go",
             "cwd": "${workspaceFolder}",
-            "args": ["proto/game.proto", "tst/go", "api", "tst/js/api"]
+            "args": ["proto", "proto/service.proto", "tst/go", "api", "tst/js/api"]
         }
     ]
 }

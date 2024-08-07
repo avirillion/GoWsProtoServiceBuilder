@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"go/format"
 	"strings"
+
+	"github.com/yoheimuta/go-protoparser/v4/interpret/unordered"
 )
 
 func GenerateGoCommon(goBaseDir string, pkg string) error {
@@ -24,12 +26,19 @@ func GenerateGoCommon(goBaseDir string, pkg string) error {
 // generateGoCommonCode creates types for all generated services
 func generateGoCommonCode(pkg string) (string, error) {
 	var sb strings.Builder
-	wn := func(s string) { sb.WriteString(s + "\n") }
+	w := func(s string) { sb.WriteString(s + "\n") }
 
-	wn("package " + pkg + "\n")
-	wn(generatorWarning)
+	w("package " + pkg + "\n")
 
-	wn(`type WebSocket interface {
+	w(`import (
+		"bytes"
+		"encoding/binary"
+	)
+	`)
+
+	w(generatorWarning)
+
+	w(`type WebSocket interface {
 		Write(msg []byte) error
 		WriteBinary(msg []byte) error
 		Set(key string, value interface{})
@@ -37,20 +46,44 @@ func generateGoCommonCode(pkg string) (string, error) {
 	}
 	`)
 
-	wn(`type Logger interface {
+	w(`type Logger interface {
 		Log(str string)
 		Logf(format string, a ...any)
 	}
 	`)
 
 	// Write generic send data function
-	wn(`func sendPushMessage(ws WebSocket, name string, log Logger, data []byte) {
+	w(`func sendPushMessage(ws WebSocket, name string, log Logger, data []byte) {
 		log.Logf("Sending push message '%s' (%d bytes)", name, len(data))
 		l := len(name) + 1 + len(data)
 		payload := make([]byte, l)
 		copy(payload, []byte(name))
 		copy(payload[len(name)+1:], data)
 		ws.WriteBinary(payload)
+	}
+	`)
+
+	w(`func byteArrayToInt(b []byte) int {
+		buf := bytes.NewBuffer(b)
+		var n int32
+		err := binary.Read(buf, binary.BigEndian, &n)
+		if err != nil {
+			return 0
+		}
+		return int(n)
+	}
+	`)
+
+	w(`func intToByteArray(n int) []byte {
+		// Create a buffer to hold the 4-byte array
+		buf := new(bytes.Buffer)
+		// Write the integer to the buffer in BigEndian format
+		err := binary.Write(buf, binary.BigEndian, int32(n))
+		if err != nil {
+			panic(err)
+		}
+		// Return the byte slice
+		return buf.Bytes()
 	}`)
 
 	formattedCode, err := format.Source([]byte(sb.String()))
@@ -58,4 +91,46 @@ func generateGoCommonCode(pkg string) (string, error) {
 		return sb.String(), err
 	}
 	return string(formattedCode), nil
+}
+
+func generateGoInterface(srv *unordered.Service, name string, withError bool) string {
+	var sb strings.Builder
+	w := func(s string) { sb.WriteString(s) }
+	wn := func(s string) { sb.WriteString(s + "\n") }
+
+	wn("type " + name + " interface {")
+	for i, rpc := range srv.ServiceBody.RPCs {
+
+		if len(rpc.Comments) > 0 && i > 0 {
+			wn("")
+		}
+		for _, c := range rpc.Comments {
+			wn(c.Raw)
+		}
+		w(rpc.RPCName + "(")
+
+		// parameter
+		if rpc.RPCRequest.MessageType != voidTypeName {
+			w("param *" + rpc.RPCRequest.MessageType)
+		}
+		w(")")
+
+		// response
+		if rpc.RPCResponse.MessageType != voidTypeName {
+			if withError {
+				wn(" (*" + rpc.RPCResponse.MessageType + ", error)")
+			} else {
+				wn(" *" + rpc.RPCResponse.MessageType)
+			}
+		} else {
+			if withError {
+				wn(" error")
+			} else {
+				wn("")
+			}
+		}
+	}
+	wn("}")
+
+	return sb.String()
 }

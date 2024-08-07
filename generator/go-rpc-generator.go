@@ -51,7 +51,7 @@ func generateGoRpcInterface(pb *unordered.Proto, pkg string) (string, error) {
 			continue
 		}
 
-		w(writeInterface(srv, srv.ServiceName, true))
+		w(generateGoInterface(srv, srv.ServiceName, true))
 	}
 
 	formattedCode, err := format.Source([]byte(sb.String()))
@@ -71,11 +71,12 @@ func generateGoRpcHandler(pb *unordered.Proto, pkg string) (string, error) {
 	w("import \"google.golang.org/protobuf/proto\"")
 	w(generatorWarning)
 
-	w(`func sendAndReturnError(s WebSocket, responseId []byte, err error) error {
-	  errResponse := &` + errorTypeName + `{
+	w(`func sendAndReturnError(s WebSocket, requestId int, err error) error {
+		errResponse := &` + errorTypeName + `{
 			Error: err.Error(),
 		}
 		errData, _ := proto.Marshal(errResponse)
+		responseId := intToByteArray(-requestId)
 		response := make([]byte, len(responseId) + len(errData))
 		copy(response, responseId)
 		copy(response[len(responseId):], errData)
@@ -98,8 +99,8 @@ func generateGoRpcHandler(pb *unordered.Proto, pkg string) (string, error) {
 				}
 			}
 			
-			// prepare response and set response id
-			responseId := inData[len(name):len(name)+4]
+			// get request id
+			requestId := byteArrayToInt(inData[len(name):len(name)+4])
 			inData = inData[len(name)+4:]
 			var outData []byte
 
@@ -115,7 +116,7 @@ func generateGoRpcHandler(pb *unordered.Proto, pkg string) (string, error) {
 			if rpc.RPCRequest.MessageType != voidTypeName {
 				w("	prm := &" + rpc.RPCRequest.MessageType + "{}")
 				w(`	if err := proto.Unmarshal(inData, prm); err != nil {
-					return sendAndReturnError(s, responseId, err)
+					return sendAndReturnError(s, requestId, err)
 				}`)
 				param = "prm"
 			}
@@ -127,14 +128,14 @@ func generateGoRpcHandler(pb *unordered.Proto, pkg string) (string, error) {
 				w(fmt.Sprintf("	err := handler.%s(%s)", rpc.RPCName, param))
 			}
 			w(`	if err != nil {
-			return sendAndReturnError(s, responseId, err)
+			return sendAndReturnError(s, requestId, err)
 			}`)
 
 			// Serialize result data
 			if rpc.RPCResponse.MessageType != voidTypeName {
 				w(`	outData, err = proto.Marshal(resp)
 				if err != nil {
-				return sendAndReturnError(s, responseId, err)
+				return sendAndReturnError(s, requestId, err)
 				}`)
 			}
 
@@ -149,6 +150,7 @@ func generateGoRpcHandler(pb *unordered.Proto, pkg string) (string, error) {
 		w(`if len(outData) == 0 {
 			outData, _ = proto.Marshal(&` + voidTypeName + `{})
 		}
+		responseId := intToByteArray(requestId);
 		response := make([]byte, len(responseId) + len(outData))
 		copy(response, responseId)
 		copy(response[len(responseId):], outData)

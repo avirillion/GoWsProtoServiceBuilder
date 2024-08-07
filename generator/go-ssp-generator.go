@@ -45,7 +45,7 @@ func generateGoSspHandler(pb *unordered.Proto, pkg string) (string, error) {
 		}
 
 		// Write interface
-		w(writeInterface(srv, srv.ServiceName, false))
+		w(generateGoInterface(srv, srv.ServiceName, false))
 
 		// Write data-struct and constructor
 		w("type " + srv.ServiceName + `Impl struct {

@@ -11,13 +11,15 @@ import (
 )
 
 func main() {
-	if len(os.Args) != 5 {
+	if len(os.Args) != 6 {
 		printHelp()
 		os.Exit(1)
 	}
-	protoBufFile := os.Args[1]
-	goBaseDir := os.Args[2]
-	goPackage := os.Args[3]
+	protoBufPath := os.Args[1]
+	protoBufFile := os.Args[2]
+	goBaseDir := os.Args[3]
+	goPackage := os.Args[4]
+	tsBaseDir := os.Args[5]
 
 	pbuf, err := parseProtoBuf(protoBufFile)
 	if err != nil {
@@ -36,11 +38,16 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	err = servicebuilder.GenerateTypeScriptFile(pbuf, protoBufPath, protoBufFile, tsBaseDir)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func printHelp() {
 	fmt.Println(`Usage:
-	service-builder <protobuf-file> <go-base-dir> <go-package> <ts-service-dir>`)
+	service-builder <protobuf-path> <protobuf-file> <go-base-dir> <go-package> <ts-service-dir>`)
 }
 
 func parseProtoBuf(file string) (*parser.Proto, error) {

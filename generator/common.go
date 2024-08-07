@@ -12,6 +12,8 @@ const generatorWarning = "// THIS FILE WAS AUTOMATICALLY GENERATED\n// DO NOT MO
 const voidTypeName = "Void"
 const errorTypeName = "Error"
 
+type dtoCollectorType = map[string]struct{}
+
 func writeFile(filename string, text string) error {
 	dir := filepath.Dir(filename)
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -38,44 +40,16 @@ func hasServiceOption(srv *unordered.Service, name string) bool {
 	return hasOption
 }
 
-func writeInterface(srv *unordered.Service, name string, withError bool) string {
-	var sb strings.Builder
-	w := func(s string) { sb.WriteString(s) }
-	wn := func(s string) { sb.WriteString(s + "\n") }
-
-	wn("type " + name + " interface {")
-	for i, rpc := range srv.ServiceBody.RPCs {
-
-		if len(rpc.Comments) > 0 && i > 0 {
-			wn("")
-		}
-		for _, c := range rpc.Comments {
-			wn(c.Raw)
-		}
-		w(rpc.RPCName + "(")
-
-		// parameter
-		if rpc.RPCRequest.MessageType != voidTypeName {
-			w("param *" + rpc.RPCRequest.MessageType)
-		}
-		w(")")
-
-		// response
-		if rpc.RPCResponse.MessageType != voidTypeName {
-			if withError {
-				wn(" (*" + rpc.RPCResponse.MessageType + ", error)")
-			} else {
-				wn(" *" + rpc.RPCResponse.MessageType)
-			}
-		} else {
-			if withError {
-				wn(" error")
-			} else {
-				wn("")
-			}
-		}
+func firstCharToUpper(s string) string {
+	if len(s) == 0 {
+		return s
 	}
-	wn("}")
+	return strings.ToUpper(s[0:1]) + s[1:]
+}
 
-	return sb.String()
+func firstCharToLower(s string) string {
+	if len(s) == 0 {
+		return s
+	}
+	return strings.ToLower(s[0:1]) + s[1:]
 }
