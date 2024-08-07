@@ -1,7 +1,7 @@
 package main
 
 import (
-	servicebuilder "GoWsProtoServiceBuilder/service-builder"
+	servicebuilder "GoWsProtoServiceBuilder/generator"
 	"fmt"
 	"log"
 	"os"
@@ -11,19 +11,28 @@ import (
 )
 
 func main() {
-	if len(os.Args) != 4 {
+	if len(os.Args) != 5 {
 		printHelp()
 		os.Exit(1)
 	}
 	protoBufFile := os.Args[1]
-	goServiceFile := os.Args[2]
+	goBaseDir := os.Args[2]
+	goPackage := os.Args[3]
 
 	pbuf, err := parseProtoBuf(protoBufFile)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = servicebuilder.GenerateGoService(pbuf, goServiceFile)
+	err = servicebuilder.GenerateGoCommon(goBaseDir, goPackage)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = servicebuilder.GenerateGoRpcService(pbuf, goBaseDir, goPackage)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = servicebuilder.GenerateGoSspService(pbuf, goBaseDir, goPackage)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -31,7 +40,7 @@ func main() {
 
 func printHelp() {
 	fmt.Println(`Usage:
-	service-builder <protobuf-file> <go-service-dir> <ts-service-dir>`)
+	service-builder <protobuf-file> <go-base-dir> <go-package> <ts-service-dir>`)
 }
 
 func parseProtoBuf(file string) (*parser.Proto, error) {

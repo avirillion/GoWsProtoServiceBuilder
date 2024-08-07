@@ -21,6 +21,19 @@ message Void {
 }
 ```
 
+
+Error Response
+--------------
+In case of an error in the RPC, the error message will be sent as the `Error` type.
+This needs to be declared in the proto file:
+
+```
+message Error {
+    Error string
+}
+```
+
+
 RPC vs Push Services
 --------------------
 To distinguish server side services (RPC: request client -> server -> response client) 

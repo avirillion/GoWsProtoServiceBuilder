@@ -1,4 +1,4 @@
-package servicebuilder
+package generator
 
 import (
 	"fmt"
@@ -72,7 +72,7 @@ func generateGoRpcHandler(pb *unordered.Proto, pkg string) (string, error) {
 	w(generatorWarning)
 
 	w(`func sendAndReturnError(s WebSocket, responseId []byte, err error) error {
-	  errResponse := &ErrorDto{
+	  errResponse := &` + errorTypeName + `{
 			Error: err.Error(),
 		}
 		errData, _ := proto.Marshal(errResponse)

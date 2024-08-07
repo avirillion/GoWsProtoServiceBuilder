@@ -1,4 +1,4 @@
-package servicebuilder
+package generator
 
 import (
 	"os"
@@ -10,6 +10,7 @@ import (
 
 const generatorWarning = "// THIS FILE WAS AUTOMATICALLY GENERATED\n// DO NOT MODIFY!\n\n"
 const voidTypeName = "Void"
+const errorTypeName = "Error"
 
 func writeFile(filename string, text string) error {
 	dir := filepath.Dir(filename)
