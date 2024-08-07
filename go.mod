@@ -1,4 +1,4 @@
-module GoWsProtoServiceBuilder
+module github.com/avirillion/GoWsProtoServiceBuilder
 
 go 1.22.5
 
