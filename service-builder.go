@@ -39,7 +39,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	err = servicebuilder.GenerateTypeScriptFile(pbuf, protoBufPath, protoBufFile, tsBaseDir)
 	if err != nil {
 		log.Fatal(err)
@@ -54,13 +53,13 @@ func printHelp() {
 func parseProtoBuf(file string) (*parser.Proto, error) {
 	reader, err := os.Open(file)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open %s, err %v", file, err)
+		return nil, fmt.Errorf("failed to open '%s', error: %v", file, err)
 	}
 	defer reader.Close()
 
 	got, err := pp.Parse(reader)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse, err %v", err)
+		return nil, fmt.Errorf("failed to parse '%s', err %v", file, err)
 	}
 	return got, nil
 }

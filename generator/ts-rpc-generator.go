@@ -45,9 +45,9 @@ func generateTypeScriptCode(pb *unordered.Proto, protoDir string, protoFile stri
 func generateTypeScriptHeader() string {
 	return generatorWarning + `
 type ResolveFunctions = {
-	name: string;
-	resolve?: (arg: any) => void;
-	reject?: (arg: any) => void;
+  name: string;
+  resolve?: (arg: any) => void;
+  reject?: (arg: any) => void;
 };
 
 `
@@ -110,13 +110,13 @@ func generateRpcServerClass(pb *unordered.Proto) string {
   }
 `)
 
-	w(`  registerCallbackHandler(name: string, cb: (data: unknown) => void) {
-	let listeners = this.callbackListeners[name];
-	if (!listeners) {
-		listeners = [];
-		this.callbackListeners[name] = listeners;
-	}
-	listeners.push(cb as (data: unknown) => void);
+	w(`  registerCallbackHandler(name: string, cb: (data: Uint8Array) => void) {
+    let listeners = this.callbackListeners[name];
+    if (!listeners) {
+      listeners = [];
+      this.callbackListeners[name] = listeners;
+    }
+    listeners.push(cb as (data: unknown) => void);
   }
 `)
 
@@ -224,8 +224,6 @@ func generateRpcServices(pb *unordered.Proto, dto dtoCollectorType) string {
 			w("  public async " + firstCharToLower(rpc.RPCName) + "(")
 			if rpc.RPCRequest.MessageType != voidTypeName {
 				w("prm: " + rpc.RPCRequest.MessageType)
-			} else {
-				wn("    const data = new Uint8Array([]);")
 			}
 			w(")")
 
@@ -265,8 +263,32 @@ func generateSspServices(pb *unordered.Proto, dto dtoCollectorType) string {
 		}
 
 		wn("export class " + srv.ServiceName + "Impl {")
-		wn("  constructor(private server: Server) {}")
-		wn("")
+		wn("  private readonly callbackListeners: { [key: string]: ((data: unknown) => void)[] } = {};\n")
+		wn("  constructor(server: Server) {")
+		for _, rpc := range srv.ServiceBody.RPCs {
+			wn("    server.registerCallbackHandler('" + rpc.RPCName + "', this." + firstCharToLower(rpc.RPCName) + ".bind(this));")
+		}
+		wn("  }\n")
+
+		wn(`  private registerCallbackHandler(name: string, cb: (data: unknown) => void) {
+    let listeners = this.callbackListeners[name];
+    if (!listeners) {
+      listeners = [];
+      this.callbackListeners[name] = listeners;
+    }
+    listeners.push(cb as (data: unknown) => void);
+  }
+
+  private callback(name: string, data: unknown) {
+    const listeners = this.callbackListeners[name];
+    if (listeners) {
+      listeners.forEach((cb) => cb(data));
+    } else {
+      console.error("No listener for: ", name);
+    }
+  }
+`)
+
 		for _, rpc := range srv.ServiceBody.RPCs {
 			dto[rpc.RPCRequest.MessageType] = struct{}{}
 			dto[rpc.RPCResponse.MessageType] = struct{}{}
@@ -276,8 +298,14 @@ func generateSspServices(pb *unordered.Proto, dto dtoCollectorType) string {
 				w("cb: (p: " + rpc.RPCRequest.MessageType + ") => void")
 			}
 			wn(") {")
-			wn("    this.server.registerCallbackHandler('" + rpc.RPCName + "', cb);")
+			wn("    this.registerCallbackHandler('" + rpc.RPCName + "', cb);")
 			wn("  }\n")
+
+			wn("  private " + firstCharToLower(rpc.RPCName) + "(rawData: Uint8Array) {")
+			wn("    const obj = " + rpc.RPCRequest.MessageType + ".decode(rawData);")
+			wn("    this.callback('" + rpc.RPCName + "', obj);")
+			wn("  }\n")
+
 		}
 		wn("}")
 	}
@@ -298,18 +326,18 @@ func generateImports(pb *unordered.Proto, protoDir string, protoFile string, dto
 		file := imp.Location[1 : len(imp.Location)-1]
 		reader, err := os.Open(protoDir + "/" + file)
 		if err != nil {
-			log.Printf("failed to open %s, err %v", file, err)
+			log.Printf("Warning: Failed to open '%s', error: %v; Skipping file.", file, err)
 			continue
 		}
 		defer reader.Close()
 
 		got, err := pp.Parse(reader)
 		if err != nil {
-			log.Printf("failed to parse %s, err %v", file, err)
+			log.Printf("Warning: Failed to parse '%s', error: %v", file, err)
 		}
 		pb, err := protoparser.UnorderedInterpret(got)
 		if err != nil {
-			log.Printf("failed to interpret %s, err %v", file, err)
+			log.Printf("Warning: Failed to interpret '%s', error: %v", file, err)
 		}
 		imports[file[:len(file)-6]] = pb
 	}

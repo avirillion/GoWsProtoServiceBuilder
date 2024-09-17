@@ -1,7 +1,7 @@
 Generates a Go service based on protobuffer files.
 
 This tool uses an existing proto buffer description and
-* Reads the service
+* Reads the service description
 * Generates a go interface for the service
 * Generates a handler to dispatch incoming binary messages to the service
 * Handles de-/serialization of parameters, responses and errors
