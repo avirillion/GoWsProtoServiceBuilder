@@ -93,7 +93,7 @@ func generateRpcServerClass(pb *unordered.Proto) string {
           promises.resolve!(msg.data);
         } else {
           let err = Error.decode(msg.data);
-          promises.reject(err.Error);
+          promises.reject!(err.Error);
         }
 
         delete this.requestMap[msg.id]
@@ -238,11 +238,13 @@ func generateRpcServices(pb *unordered.Proto, dto dtoCollectorType) string {
 			} else {
 				wn("    const data = new Uint8Array([]);")
 			}
-			wn("    const responseData = await this.server.rpc('" + rpc.RPCName + "', data);")
 
 			if rpc.RPCResponse.MessageType != voidTypeName {
+				wn("    const responseData = await this.server.rpc('" + rpc.RPCName + "', data);")
 				wn("    const responseObj = " + rpc.RPCResponse.MessageType + ".decode(responseData);")
 				wn("    return responseObj;")
+			} else {
+				wn("    await this.server.rpc('" + rpc.RPCName + "', data);")
 			}
 			wn("  }\n")
 		}
@@ -298,7 +300,7 @@ func generateSspServices(pb *unordered.Proto, dto dtoCollectorType) string {
 				w("cb: (p: " + rpc.RPCRequest.MessageType + ") => void")
 			}
 			wn(") {")
-			wn("    this.registerCallbackHandler('" + rpc.RPCName + "', cb);")
+			wn("    this.registerCallbackHandler('" + rpc.RPCName + "', cb as (data: unknown) => void);")
 			wn("  }\n")
 
 			wn("  private " + firstCharToLower(rpc.RPCName) + "(rawData: Uint8Array) {")
@@ -339,12 +341,16 @@ func generateImports(pb *unordered.Proto, protoDir string, protoFile string, dto
 		if err != nil {
 			log.Printf("Warning: Failed to interpret '%s', error: %v", file, err)
 		}
-		imports[file[:len(file)-6]] = pb
+		fileNameBase := file[:len(file)-6]
+		imports[fileNameBase] = pb
 	}
 
 	// Convert from type1:file1, type2:file1 to file1:[type1,type2]
 	fileImports := make(map[string][]string)
 	for typ := range dto {
+		if typ == "Void" {
+			continue
+		}
 		// Find references
 	out:
 		for pbFile, pbData := range imports {
