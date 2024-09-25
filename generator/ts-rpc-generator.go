@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/yoheimuta/go-protoparser/v4"
@@ -366,6 +367,7 @@ func generateImports(pb *unordered.Proto, protoDir string, protoFile string, dto
 	w := func(s string) { sb.WriteString(s + "\n") }
 
 	for file, types := range fileImports {
+		slices.Sort(types)
 		w("import { " + strings.Join(types, ", ") + " } from './" + file + "';")
 	}
 	return sb.String()
